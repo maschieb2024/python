@@ -1,0 +1,8 @@
+   'KZ','Erscheinung','WBKdNr','WBAboNr','NWKdNr','NWVerkehrsNr','Anrede','Titel','Vorname','Hausname','Zusatz1','Zusatz2','Zusatz3','Strasse','HausNr','HausBs','Lkz','Plz','Ort','Tour','Ablage','Gs','Bezirk','Produkt','Stueck_Mo','Stueck_Di','Stueck_Mi','Stueck_Do','Stueck_Fr','Stueck_Sa','Stueck_So','Stueck_tgl','Lieferhinweis','VertArt'
+   'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','a1','b1','c1','d1','e1','f1','g1','h1'
+   
+   
+   
+   
+   'KZ','Erscheinung','WBKdNr','WBAboNr','NWKdNr','NWVerkehrsNr','Anrede','Titel','Vorname','Hausname','Zusatz1','Zusatz2','Zusatz3','Strasse','HausNr','HausBs','Lkz','Plz','Ort','Tour','Ablage','Gs','Bezirk','Produkt',StueckMo',StueckDi',StueckMi',StueckDo',StueckFr',StueckSa',StueckSo',Stuecktgl','Lieferhinweis','VertArt'
+   'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','a1','b1','c1','d1','e1','f1','g1','h1'

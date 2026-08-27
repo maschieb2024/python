@@ -1,0 +1,540 @@
+-- #### WB in HK import ####
+-- #### Mittwoch, 17. März 2021
+-- #### Step 1 nur Zugaenge
+-- #### Anpassung GP-Nummer bei Zugängen - 29.06.2021
+
+use VT_Prod
+GO
+DECLARE @datei_vorhanden int
+--EXEC master..xp_fileexist '\\nw.bi\global\Share\Unix\SAP\VIVA\VERTRIEB\WB\HKABOS.TXT', 
+EXEC master..xp_fileexist 'C:\TEMP\HKABOS.TXT', 
+@datei_vorhanden OUTPUT 
+
+IF @datei_vorhanden = 1 
+BEGIN
+IF OBJECT_ID (N'vt_prod.dbo.HKABOS') IS NOT NULL DROP TABLE vt_prod.dbo.HKABOS
+IF OBJECT_ID (N'vt_prod.dbo.temp_HKABOS_VIVA') IS NOT NULL DROP TABLE vt_prod.dbo.temp_HKABOS_VIVA
+IF OBJECT_ID (N'dbo.HKDelta') IS NOT NULL DROP TABLE dbo.HKDelta
+IF OBJECT_ID (N'vt_prod.dbo.GP_ADRessen') IS NOT NULL DROP TABLE vt_prod.dbo.GP_ADRessen
+-- ##########################################################################################
+-- Aktuelle WB Daten laden
+-- drop table vt_prod.dbo.HKABOS
+CREATE TABLE vt_prod.dbo.HKABOS
+                ( [KZ] nvarchar(50)
+                , [Erscheinung] date
+                , [WB-Kd-Nr] nvarchar(50)
+                , [WB-Abo-Nr] nvarchar(50)
+                , [NW-Kd-Nr] nvarchar(50)
+                , [NW-Verkehrs-Nr] nvarchar(50)
+                , [Anrede] nvarchar(50)
+                , [Titel] nvarchar(50)
+                , [Vorname] nvarchar(50)
+                , [Hausname] nvarchar(250)
+                , [Zusatz1] nvarchar(150)
+                , [Zusatz2] nvarchar(150)
+                , [Zusatz3] nvarchar(150)
+                , [Strasse] nvarchar(50)
+                , [Haus-Nr] nvarchar(50)
+                , [Haus-Bs] nvarchar(50)
+                , [Lkz] nvarchar(50)
+                , [Plz] nvarchar(50)
+                , [Ort] nvarchar(50)
+                , [Tour] nvarchar(50)
+                , [Ablage] nvarchar(50)
+                , [Gs] nvarchar(50)
+                , [Bezirk] nvarchar(50)
+                , [Produkt] nvarchar(50)
+                , [Stück_Mo] nvarchar(50)
+                , [Stück_Di] nvarchar(50)
+                , [Stück_Mi] nvarchar(50)
+                , [Stück_Do] nvarchar(50)
+                , [Stück_Fr] nvarchar(50)
+                , [Stück_Sa] nvarchar(50)
+                , [Stück_So] nvarchar(50)
+                , [Stück_tgl] nvarchar(50)
+                , [Lieferhinweis] nvarchar(500)
+                , [Vert-Art] nvarchar(50))
+        
+
+IF (SELECT DATEPART(dw,GETDATE())) = 6
+    BEGIN
+        BULK INSERT vt_prod.dbo.HKABOS FROM 'C:\TEMP\HKABOS_MO.TXT' 
+        WITH (FIRSTROW = 1, FIELDTERMINATOR = ';', CODEPAGE='65001', ROWTERMINATOR = '\n');
+    END
+ELSE 
+    BEGIN
+        BULK INSERT vt_prod.dbo.HKABOS FROM 'C:\TEMP\HKABOS.TXT' 
+        WITH (FIRSTROW = 1, FIELDTERMINATOR = ';', CODEPAGE='65001', ROWTERMINATOR = '\n');
+END
+-- ##########################################################################################
+---- Wenn mindestens eine Datei von gestern ist, stürze ab
+DECLARE @datumvortag as date = convert(date,getdate()-1)
+DECLARE @datumAktuell as date = (SELECT Min(Erscheinung) FROM hkabos)
+IF @datumVortag = @datumAktuell
+BEGIN 
+    raiserror('Mindestens eine Datei ist nicht neu 1', 11, 11)
+    RETURN
+END
+DECLARE @anzahltage as int = (select count(distinct Erscheinung) from HKABOS)
+IF @anzahltage > 1
+BEGIN 
+drop table vt_prod.dbo.HKABOS
+CREATE TABLE HKABOS
+                ( [KZ] nvarchar(50)
+                , [Erscheinung] date
+                , [WB-Kd-Nr] nvarchar(50)
+                , [WB-Abo-Nr] nvarchar(50)
+                , [NW-Kd-Nr] nvarchar(50)
+                , [NW-Verkehrs-Nr] nvarchar(50)
+                , [Anrede] nvarchar(50)
+                , [Titel] nvarchar(50)
+                , [Vorname] nvarchar(50)
+                , [Hausname] nvarchar(250)
+                , [Zusatz1] nvarchar(150)
+                , [Zusatz2] nvarchar(150)
+                , [Zusatz3] nvarchar(150)
+                , [Strasse] nvarchar(50)
+                , [Haus-Nr] nvarchar(50)
+                , [Haus-Bs] nvarchar(50)
+                , [Lkz] nvarchar(50)
+                , [Plz] nvarchar(50)
+                , [Ort] nvarchar(50)
+                , [Tour] nvarchar(50)
+                , [Ablage] nvarchar(50)
+                , [Gs] nvarchar(50)
+                , [Bezirk] nvarchar(50)
+                , [Produkt] nvarchar(50)
+                , [Stück_Mo] nvarchar(50)
+                , [Stück_Di] nvarchar(50)
+                , [Stück_Mi] nvarchar(50)
+                , [Stück_Do] nvarchar(50)
+                , [Stück_Fr] nvarchar(50)
+                , [Stück_Sa] nvarchar(50)
+                , [Stück_So] nvarchar(50)
+                , [Stück_tgl] nvarchar(50)
+                , [Lieferhinweis] nvarchar(500)
+                , [Vert-Art] nvarchar(50)
+                , Eweise nvarchar(100))
+    raiserror('Mindestens eine Datei ist nicht neu 2', 11, 11)
+    RETURN
+END
+-- ##########################################################################################
+-- Falsche Bezirke löschen
+DELETE FROM HKABOS WHERE Bezirk between 995 and 999
+-- Nicht zustellbare Stücke löschen GS = 0
+DELETE FROM HKABOS WHERE GS = 0
+-- Mengen wegschreiben später anpassen
+insert into vt_prod.dbo.VT_HK_Mengen (Tagesdatum, Produkt, Liefertag, Abos)
+select convert(date,Getdate()), Produkt,  Min(Erscheinung), count([WB-Abo-Nr]) FROM HKABOS group by Erscheinung, Produkt
+-- Erscheinungsweise an WB+GL-Abos anfügen
+Alter Table HKABOS add Eweise nvarchar(100);
+update HKABOS
+set HKABOS.Eweise = case when (Stück_tgl IS NULL or Stück_tgl = 0) then
+                        concat(CASE WHEN ISNULL(Stück_Mo,0) > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN ISNULL(Stück_DI,0) > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN ISNULL(Stück_MI,0) > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN ISNULL(Stück_DO,0) > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN ISNULL(Stück_Fr,0) > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN ISNULL(Stück_Sa,0) > 0 THEN 'X' ELSE ' ' END,
+                                ' ')
+                                Else 'XXXXXX ' END
+from HKABOS
+update HKABOS set Stück_tgl = stück_sa from HKABOS Where eweise = 'XXXXXX ' and (Stück_tgl is null or Stück_tgl = ' ' or Stück_tgl = 0)
+update HKABOS set Stück_Mo = 0, Stück_Di = 0, Stück_Mi = 0, Stück_do = 0, Stück_Fr = 0, Stück_Sa = 0, Stück_So = 0
+ from HKABOS where Stück_tgl > 0
+
+-- Titel löschen
+update HKABOS set Titel = '' from HKABOS
+-- Semikolon aus Vert-art entfernen
+update HKABOS set [Vert-Art] = replace([Vert-Art],';','') from HKABOS
+-- Neue Ausgabe gegen alte tauschen
+Update [VT_Prod].[dbo].HKABOS
+set produkt =
+case
+when WBA.Produkt = WBP.prod_neu Then WBP.PR_VK_ID
+else Produkt
+end 
+from [VT_Prod].[dbo].HKABOS as wba
+left join WB_IMPORT.dbo.WB_Ausgaben_HK as WBP
+on (WBA.Produkt = WBP.prod_neu)
+-- Nur Vertragsnummer einsetzen (Feldgrösse)
+update HKABOS set [WB-Kd-Nr] = '' from HKABOS where [WB-Abo-Nr] like '%/%'
+-- ##########################################################################################
+IF OBJECT_ID (N'vt_prod.dbo.temp_HKABOS_VIVA') IS NOT NULL DROP TABLE vt_prod.dbo.temp_HKABOS_VIVA ;
+CREATE TABLE vt_prod.dbo.temp_HKABOS_VIVA
+                ( [KZ] nvarchar(50)
+                , [Erscheinung] date
+                , [WB-Kd-Nr] nvarchar(50)
+                , [WB-Abo-Nr] nvarchar(50)
+                , [NW-Kd-Nr] nvarchar(50)
+                , [NW-Verkehrs-Nr] nvarchar(50)
+                , [Anrede] nvarchar(50)
+                , [Titel] nvarchar(50)
+                , [Vorname] nvarchar(50)
+                , [Hausname] nvarchar(250)
+                , [Zusatz1] nvarchar(150)
+                , [Zusatz2] nvarchar(150)
+                , [Zusatz3] nvarchar(150)
+                , [Strasse] nvarchar(50)
+                , [Haus-Nr] nvarchar(50)
+                , [Haus-Bs] nvarchar(50)
+                , [Lkz] nvarchar(50)
+                , [Plz] nvarchar(50)
+                , [Ort] nvarchar(50)
+                , [Tour] nvarchar(50)
+                , [Ablage] nvarchar(50)
+                , [Gs] nvarchar(50)
+                , [Bezirk] nvarchar(50)
+                , [Produkt] nvarchar(50)
+                , [Stück_Mo] nvarchar(50)
+                , [Stück_Di] nvarchar(50)
+                , [Stück_Mi] nvarchar(50)
+                , [Stück_Do] nvarchar(50)
+                , [Stück_Fr] nvarchar(50)
+                , [Stück_Sa] nvarchar(50)
+                , [Stück_So] nvarchar(50)
+                , [Stück_tgl] nvarchar(50)
+                , [Lieferhinweis] nvarchar(500)
+                , [Vert-Art] nvarchar(50)) 
+Insert into vt_prod.dbo.temp_HKABOS_VIVA
+([KZ], [Erscheinung], 
+[WB-Kd-Nr], [WB-Abo-Nr], [NW-Kd-Nr], [NW-Verkehrs-Nr],
+[Anrede], [Titel], [Vorname], [Hausname], [Zusatz1], [Zusatz2], [Zusatz3],
+[Strasse], [Haus-Nr], [Haus-Bs], [Lkz], [Plz], [Ort],
+[Tour], [Ablage], [Gs], [Bezirk], [Produkt],
+[Stück_Mo], [Stück_Di], [Stück_Mi], [Stück_Do], [Stück_Fr], [Stück_Sa], [Stück_So], [Stück_tgl],
+[Lieferhinweis], [Vert-Art])
+select distinct
+'WB', convert(date,getdate()),
+ID_FREMDVERLAG, ' ', ID_GESCHAEFTSPARTNER, ID_GESCHAEFTSPARTNER_LFDNR,
+GP_ANREDE, GP_TITEL, GP_VORNAME, 
+case 
+    when GP_ANREDE = 'FA' then GP_GESAMT_NAME_1
+    else GP_NACHNAME
+    end, 
+GP_GESAMT_NAME_1, GP_GESAMT_NAME_2, ' ',
+GP_ADRESSE_STRASSE, GP_ADRESSE_HAUSNR, GP_ADRESSE_HNR_ZUSATZ, GP_ADRESSE_STAAT, GP_ADRESSE_PLZ, GP_ADRESSE_WOHNORT,
+' ', ' ',SUBSTRING(GEBIET_ZUSTELLUNG,3,2), GEBIET_ZUSTELLUNG, AUSGABEN_ID,
+case
+    when (ERSCHEINUNGSWEISE_TEXT like '%Mo%'
+            and ERSCHEINUNGSWEISE_TEXT != 'Mo+Di+Mi+Do+Fr+Sa') then Anzahl
+    else ''
+    end,
+case
+    when (ERSCHEINUNGSWEISE_TEXT like '%Di%' 
+            and ERSCHEINUNGSWEISE_TEXT != 'Mo+Di+Mi+Do+Fr+Sa') then Anzahl
+    else ''
+    end,
+case
+    when (ERSCHEINUNGSWEISE_TEXT like '%Mi%' 
+            and ERSCHEINUNGSWEISE_TEXT != 'Mo+Di+Mi+Do+Fr+Sa') then Anzahl
+    else ''
+    end,
+case
+    when (ERSCHEINUNGSWEISE_TEXT like '%Do%' 
+            and ERSCHEINUNGSWEISE_TEXT != 'Mo+Di+Mi+Do+Fr+Sa') then Anzahl
+    else ''
+    end,
+case
+    when (ERSCHEINUNGSWEISE_TEXT like '%Fr%' 
+            and ERSCHEINUNGSWEISE_TEXT != 'Mo+Di+Mi+Do+Fr+Sa') then Anzahl
+    else ''
+    end,
+case
+    when (ERSCHEINUNGSWEISE_TEXT like '%Sa%' 
+            and ERSCHEINUNGSWEISE_TEXT != 'Mo+Di+Mi+Do+Fr+Sa') then Anzahl
+    else ''
+    end,
+'0',
+case
+    when ERSCHEINUNGSWEISE_TEXT =  'Mo+Di+Mi+Do+Fr+Sa' then Anzahl
+    else ''
+    end,
+'', VERTEILART_ID 
+from BI_Stage_2.dbo.ABOVERTRÄGE_HISTORISCH_UEBRIGE_AUSGABEN_inftabo_viva__V3_16_T
+where AUSGABEN_ID between '9802' and '9899'
+and (DATENZEILE_GUETIG_AM is not null or DATENZEILE_GUELTIG_AB >= convert(date,getdate()))
+and DATENZEILE_GUELTIG_BIS > convert(date,getdate()+2)
+and ID_BUKRS = '0090'
+-- Erscheinungsweise an NW-Abos anfügen
+Alter Table vt_prod.dbo.temp_HKABOS_VIVA add Eweise nvarchar(100)
+update vt_prod.dbo.temp_HKABOS_VIVA
+set vt_prod.dbo.temp_HKABOS_VIVA.Eweise = case when (Stück_tgl IS NULL or Stück_tgl = 0) then
+                        concat( CASE WHEN Stück_Mo > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN Stück_DI > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN Stück_MI > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN Stück_DO > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN Stück_Fr > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN Stück_Sa > 0 THEN 'X' ELSE ' ' END,
+                                CASE WHEN Stück_So > 0 THEN 'X' ELSE ' ' END
+--                                  '0'
+                                  )
+                                Else 'XXXXXX '
+                end
+from vt_prod.dbo.temp_HKABOS_VIVA
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = 1 from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = 'XXXXXX ' and (Stück_tgl is null or Stück_tgl = ' ' or Stück_tgl = 0)
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = Stück_Sa from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = '     X '
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = Stück_Fr from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = '    X  '
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = Stück_Do from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = '   X   '
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = Stück_Mi from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = '  X    '
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = Stück_Di from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = ' X     '
+update vt_prod.dbo.temp_HKABOS_VIVA set Stück_tgl = Stück_Mo from vt_prod.dbo.temp_HKABOS_VIVA Where eweise = 'X      '
+
+-----------------------------------------------------------------------------------------------------------------
+---------------------------------Berechnung Zugänge -------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------------------
+SELECT    convert(date,getdate()) as Datum
+        , T1.Produkt as Produkt
+        , 'WB_FREMD' as Verlag
+        , CONVERT(nvarchar(2), '01') as Typ
+        , '' as Storno
+        , case when isnull(T1.Stück_tgl,0) > 0 then T1.Stück_tgl else 1 end as Anzahl
+        , CONVERT(date, DATEADD("day", 1,GETDATE())) as Gueltigab -- datediff getdate +1
+        , CONVERT(date, '9999-12-31') Gueltigbis
+-- Donnerstag, 6. Dezember 2018
+        , case
+            when (T1.Hausname = '' or T1.Hausname  is null) then T1.Zusatz1
+            else CONVERT(nvarchar(30), LEFT(T1.Hausname,30)) 
+            end as name
+--      , CONVERT(nvarchar(30), LEFT(T1.Hausname,30)) as name
+        , CONVERT(nvarchar(20), LEFT(T1.Vorname,20)) as Vorname
+        , CASE WHEN T1.Anrede IN ('HR', 'Herrn', 'Herr', 'Freiherr', 'Eheleute', 'Familie') THEN 'Herr'
+               WHEN T1.Anrede IN ('FR', 'Freifrau', 'Frau') THEN 'Frau' 
+               ELSE 'Firma'
+               END as Anrede
+        , CASE WHEN T1.Anrede IN ('HR', 'FR','Herrn', 'Herr', 'Freiherr', 'Freifrau', 'Frau', 'Eheleute', 'Familie') THEN 1 ELSE 2 END as Rechtsform
+        , T1.Strasse as Strasse
+        , COALESCE(CONCAT(T1.[Haus-Nr], T1.[Haus-Bs]), '') as Hausnummer
+        , T1.Plz as PLZ
+        , T1.Ort as Ort
+        , '38003' as MAId
+        , '2' as MAPos
+--        , ' ' as 'AbGrund'
+        , CASE WHEN (T1.Stück_tgl IS NULL or T1.Stück_tgl = 0) 
+            THEN
+            REPLACE(REPLACE(CONCAT( CASE WHEN ISNULL(T1.Stück_Mo,0) > 0 THEN 1 ELSE 0 END ,
+                                    CASE WHEN ISNULL(T1.Stück_Di,0) > 0 THEN 1 ELSE 0 END ,
+                                    CASE WHEN ISNULL(T1.Stück_Mi,0) > 0 THEN 1 ELSE 0 END ,
+                                    CASE WHEN ISNULL(T1.Stück_Do,0) > 0 THEN 1 ELSE 0 END ,
+                                    CASE WHEN ISNULL(T1.Stück_Fr,0) > 0 THEN 1 ELSE 0 END ,
+                                    CASE WHEN ISNULL(T1.Stück_Sa,0) > 0 THEN 1 ELSE 0 END , 0), '0',' '),'1','X')
+            ELSE  'XXXXXX ' END AS eweise
+        , T2.[NW-Kd-Nr] as 'GP'
+        , format(convert(int,t2.[NW-Verkehrs-Nr]),'000') as 'Adresse'
+        , concat(T1.[WB-Kd-Nr],T1.[WB-Abo-Nr]) as VERTRAG
+        --, ID_WB
+INTO #Zugaenge
+from HKABOS as T1
+    left join temp_HKABOS_VIVA as T2
+    on concat([T1].[WB-Kd-Nr],[T1].[WB-Abo-Nr]) = [T2].[WB-Kd-Nr] 
+    where T2.[WB-Kd-Nr] is null
+delete from #Zugaenge where (Vertrag is null or Vertrag = '')
+select distinct abo.ID_GESCHAEFTSPARTNER, '001' as 'LFDNR', Zu.VERTRAG
+into #GPupdate
+from #Zugaenge as ZU
+left Join BI_Stage_2.dbo.ABOVERTRÄGE_HISTORISCH_UEBRIGE_AUSGABEN_inftabo_viva__V3_16_T as abo
+on (zu.name = abo.GP_NACHNAME
+    and zu.Vorname = abo.GP_VORNAME
+    and ZU.PLZ = abo.GP_ADRESSE_PLZ)
+where abo.DATENZEILE_GUELTIG_BIS = abo.ENDE_DATUM_ORIGINAL
+-- select * from #Zugaenge
+update #Zugaenge
+set gp = T2.ID_GESCHAEFTSPARTNER, Adresse = T2.LFDNR
+from #Zugaenge as T1
+left join #GPupdate as T2
+on(T1.VERTRAG = T2.VERTRAG)
+
+-- ###################### Alles zusammenführen + Kopfzeile ######################################
+
+SELECT * INTO #DELTA FROM #Zugaenge
+
+-- ###################### Alles zusammenführen + Kopfzeile ######################################
+use VT_Prod
+create Table HKDelta (
+          Datum nvarchar(150)
+        , Produkt nvarchar(150)
+        , Verlag nvarchar(150)
+        , Typ nvarchar(150)
+        , Storno nvarchar(150)
+        , Anzahl nvarchar(150)
+        , Gueltigab nvarchar(150)
+        , Gueltigbis nvarchar(150)
+        , Name nvarchar(150)
+        , Vorname nvarchar(150)
+        , Anrede nvarchar(150)
+        , Rechtsform nvarchar(150)
+        , Strasse nvarchar(150)
+        , Hausnummer nvarchar(150)
+        , PLZ nvarchar(150)
+        , Ort nvarchar(150)
+        , MAId nvarchar(150)
+        , MAPos nvarchar(150)
+--      , AbGrund nvarchar(150)
+        , eweise nvarchar(150)
+        , GP nvarchar(150)
+        , Adresse nvarchar(150)
+        , Vertrag nvarchar(150) )
+insert into vt_prod.dbo.HKDelta
+    (Datum, Produkt, Verlag , Typ, Storno, Anzahl, Gueltigab, Gueltigbis, name, Vorname, Anrede, Rechtsform, Strasse, Hausnummer
+    ,PLZ, Ort, MAId, MAPos, eweise, GP, Adresse, VERTRAG )
+SELECT 
+    'Datum', 'Produkt', 'Verlag' , 'Typ', 'Storno', 'Anzahl', 'Gueltigab', 'Gueltigbis', 'name', 'Vorname', 'Anrede'
+    ,'Rechtsform', 'Strasse', 'Hausnummer', 'PLZ', 'Ort', 'MAId', 'MAPos', 'eweise', 'GP', 'Adresse', 'VERTRAG'
+union all SELECT    
+          convert(nvarchar(150),Datum)
+        , convert(varchar(5),replace(Produkt,'14','12'))
+        , Verlag 
+        , Typ
+        , case when [Storno] = '' then null else convert(nvarchar(10),Storno) end
+        , convert(nvarchar(10),Anzahl)
+        , convert(nvarchar(25),Gueltigab)
+        , case when [Gueltigbis] is null then null else convert(nvarchar(25),Gueltigbis) end
+        , name
+        , case when [Vorname] is null then null else convert(nvarchar(100),Vorname) end
+        , Anrede
+        , convert(nvarchar(10),Rechtsform)
+        , Strasse
+        , Hausnummer
+        , convert(nvarchar(10),PLZ)
+        , Ort
+        , MAId
+        , MAPos
+--        , AbGrund
+        , eweise
+        , GP
+        , Adresse
+        , replace(convert(nvarchar(100),VERTRAG),' ','') as 'VERTRAG'
+ from #Delta
+
+-- #### 29.06.2021
+-- #### Adressen für GP-Nummer selektieren
+select PLZ_HS, NAME, VORNAME, STRASSE, HAUSNR,HAUSNR_ZUS, max(GP_ID) as 'GPID' 
+into vt_prod.dbo.GP_ADRessen
+from vivainfo.dbo.txtGPAdressen
+where LANDK = 'D'
+and PLZ_HS in ('33775','33790','33803','33813','33824','33829','49201','49201','49214')
+and ANREDE_ID in ('FR','HR')
+group by PLZ_HS, NAME, VORNAME, STRASSE, HAUSNR,HAUSNR_ZUS
+-- #### Update GP-Nummer
+update HKDelta
+set GP = adr.gpID, adresse = case when adr.gpID is null then null else '001' END 
+from HKDelta as hkd
+left join vt_prod.dbo.GP_ADRessen as adr
+on (hkd.PLZ = adr.PLZ_HS
+    and hkd.Name = adr.NAME
+    and hkd.Vorname = adr.VORNAME
+    and hkd.Strasse = adr.STRASSE
+    and hkd.Hausnummer = replace(concat(adr.HAUSNR,adr.HAUSNR_ZUS),' ',''))
+-- #### Update Kopfzeile
+update HKDelta
+set GP = case when eweise = 'eweise' then  'GP' else gp END, 
+    Adresse = case when eweise = 'eweise' then  'Adresse' else Adresse END 
+from HKDelta as hkd
+
+
+
+-- Donnerstag, 11. April 2019
+-- #### Bei mehr als 5000 Verändeerungen abbruch
+DECLARE @menge as int
+set @menge =  (select count(*) FROM [VT_Prod].[dbo].[HKDelta])
+-- select @menge
+IF @menge >= 500
+BEGIN 
+    raiserror('Zuviele Veränderungen!', 11, 11)
+    RETURN
+END
+-- #### 
+--#### Donnerstag, 11. April 2019
+--#### Mengen wegschreiben zur Kontrolle
+declare @tag as date = (convert(date,getdate()))
+delete FROM [VT_Prod].[dbo].[t_HKGL_Mengen] where VTag = @tag
+insert into vt_prod.dbo.t_HKGL_Mengen
+SELECT @tag, typ, count(anzahl)
+  FROM [VT_Prod].[dbo].[HKDelta]
+  group by datum, typ
+  having Datum != 'DATUM'
+union all
+SELECT @tag, 'GES', count(anzahl)
+  FROM [VT_Prod].[dbo].[HKDelta]
+  group by datum
+  having Datum != 'DATUM'
+union all
+-- SELECT DATEADD(DAY, -1, Erscheinung), 'WBGL', count(*)
+SELECT @tag, 'WBHK', count(*) FROM [VT_Prod].[dbo].[HKABOS]  group by Erscheinung
+--#################################
+-- Sonntag, 13. April 2019
+declare @Tges as float  =(  SELECT [STK]
+                            FROM [VT_Prod].[dbo].[t_WBHK_Mengen]
+                            where VTag = @tag
+                            and Typ = 'GES')
+declare @Gges as float  =(  SELECT [STK]
+                            FROM [VT_Prod].[dbo].[t_WBHK_Mengen]
+                            where VTag = @tag
+                            and Typ = 'WBHK')
+declare @Proz as float  = (@Tges*100/@Gges)
+--Sonntag, 13. April 2019
+IF @Proz > 20
+BEGIN 
+    raiserror('Sehr hoher Prozentsatz', 11, 11)
+    RETURN
+END
+if @Gges <5
+BEGIN 
+    raiserror('Zu wenig Datensätze', 11, 11)
+    RETURN
+END
+
+-- select * from VT_Prod.dbo.HKDelta
+
+-- #### Ausgabe Datei HKDeltaResult_ZU.csv
+-- EXEC xp_cmdshell 'bcp "SELECT * FROM VT_Prod.dbo.HKDelta order by typ desc" queryout \\nw.bi\global\Share\Unix\SAP\VIVA\VERTRIEB\WB\HKDeltaResult_ZU.csv -c -t; -T -C ACP'
+EXEC xp_cmdshell 'bcp "SELECT * FROM VT_Prod.dbo.HKDelta order by typ desc" queryout C:\Temp\HKDeltaResult_ZU.csv -c -t; -T -C ACP'
+
+--#### Tabelle löschen
+IF OBJECT_ID (N'dbo.HKDelta') IS NOT NULL DROP TABLE dbo.HKDelta;
+--#################################
+--######################################################
+
+IF OBJECT_ID (N'vt_prod.dbo.HKABOS') IS NOT NULL DROP TABLE vt_prod.dbo.HKABOS;
+CREATE TABLE vt_prod.dbo.HKABOS
+                ( [KZ] nvarchar(50)
+                , [Erscheinung] date
+                , [WB-Kd-Nr] nvarchar(50)
+                , [WB-Abo-Nr] nvarchar(50)
+                , [NW-Kd-Nr] nvarchar(50)
+                , [NW-Verkehrs-Nr] nvarchar(50)
+                , [Anrede] nvarchar(50)
+                , [Titel] nvarchar(50)
+                , [Vorname] nvarchar(50)
+                , [Hausname] nvarchar(250)
+                , [Zusatz1] nvarchar(150)
+                , [Zusatz2] nvarchar(150)
+                , [Zusatz3] nvarchar(150)
+                , [Strasse] nvarchar(50)
+                , [Haus-Nr] nvarchar(50)
+                , [Haus-Bs] nvarchar(50)
+                , [Lkz] nvarchar(50)
+                , [Plz] nvarchar(50)
+                , [Ort] nvarchar(50)
+                , [Tour] nvarchar(50)
+                , [Ablage] nvarchar(50)
+                , [Gs] nvarchar(50)
+                , [Bezirk] nvarchar(50)
+                , [Produkt] nvarchar(50)
+                , [Stück_Mo] nvarchar(50)
+                , [Stück_Di] nvarchar(50)
+                , [Stück_Mi] nvarchar(50)
+                , [Stück_Do] nvarchar(50)
+                , [Stück_Fr] nvarchar(50)
+                , [Stück_Sa] nvarchar(50)
+                , [Stück_So] nvarchar(50)
+                , [Stück_tgl] nvarchar(50)
+                , [Lieferhinweis] nvarchar(500)
+                , [Vert-Art] nvarchar(50)
+                , Eweise nvarchar(100))
+ -- ##########################################################################################
+drop table #zugaenge
+drop table #Delta
+drop table #GPupdate
+-- ##########################################################################################
+END
