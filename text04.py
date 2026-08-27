@@ -4,7 +4,6 @@ import os
 
 load_dotenv()
 
-
 def speichern(datum,text_,punkte,option_wert):
 
     db = mysql.connector.connect(
