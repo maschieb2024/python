@@ -5,6 +5,8 @@ data = {"country":["Finnland","Denmark"],
       "scoure":[7,6]}
 df = pd.DataFrame(data)
 
+
+
 fig = px.bar(df, 
              x="country",
              y="scoure",

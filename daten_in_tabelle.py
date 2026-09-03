@@ -4,8 +4,12 @@ import os
 
 load_dotenv()
 
+def speichern():
 
-def speichern(datum,text_,punkte,option_wert):
+    datum = '2026-08-27'
+    text_ = 'Hier steht neuer Text'
+    punkte = 1005
+    option_wert = '5'
 
     db = mysql.connector.connect(
     host=os.getenv("DB_HOST"),
@@ -35,11 +39,4 @@ def speichern(datum,text_,punkte,option_wert):
     db.close()
 
 
-# speichern()
-
-datum = '2026-08-29'
-text_ = 'Renteneinstieg'
-punkte = 1009
-option_wert = '11'
-
-speichern(datum,text_,punkte,option_wert)
+speichern()
