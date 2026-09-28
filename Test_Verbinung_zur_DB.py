@@ -1,5 +1,7 @@
 import mysql.connector
 
+# unter Python 3.14.0 den mysql-Connector-python auf version 9.7.0 zurückstellen
+
 print("Connector:", mysql.connector.__version__)
 
 try:
